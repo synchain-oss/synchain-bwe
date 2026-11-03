@@ -1,0 +1,22 @@
+# Allow-list: only the files this repository needs are tracked. Everything else stays out, above all audio, model
+# files, ceiling files and reports (those describe a real voice).
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/README.zh-CN.md
+!/SECURITY.md
+!/pyproject.toml
+!/src/
+!/tests/
+!/.github/
+/src/**/*
+!/src/**/
+!/src/**/*.py
+/tests/**/*
+!/tests/**/
+!/tests/**/*.py
+/.github/**/*
+!/.github/**/
+!/.github/**/*.yml
+__pycache__/

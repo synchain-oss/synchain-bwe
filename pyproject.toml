@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synchain-bwe"
+dynamic = ["version"]
+description = "Adds the missing high band to band-limited voices (AI voices at 16, 22.05 or 24 kHz), with LavaSR's guess re-levelled to the voice's own level"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Synchain" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "soundfile>=0.12",
+    "soxr>=0.3",
+    "pyyaml>=6",
+    "huggingface_hub>=0.20",
+    "torch>=2.6",
+    "torchaudio>=2.6",
+    # The Vocos fork LavaSR's weights were trained with, at the commit this was tested with.
+    "vocos @ git+https://github.com/langtech-bsc/vocos.git@451e522f7a11c3652c9522f63ea6780736d93de0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+synchain-bwe = "synchain_bwe.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/synchain-oss/synchain-bwe"
+Issues = "https://github.com/synchain-oss/synchain-bwe/issues"
+
+[tool.setuptools.dynamic]
+version = { attr = "synchain_bwe.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
