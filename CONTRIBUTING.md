@@ -14,8 +14,10 @@ ruff check .
 
 ## What must stay out of this repository
 
-No audio, model files, ceiling files or reports, and no numbers measured from a real voice, in code, tests, docs or
-comments. Those describe a real person's voice, and git history is public for good. Tests use synthetic signals.
+No audio, model files, ceiling files or reports, and no ceiling values or other measurements of a real voice in code,
+tests or comments. Those describe a real person's voice, and git history is public for good. Tests use synthetic signals.
+The only numbers about a real voice in this repository are the summary comparisons in the README; please don't add to
+them.
 `.gitignore` is an allow-list and CI checks the whole history, so a new kind of file also needs a change to both.
 
 ## Pull requests

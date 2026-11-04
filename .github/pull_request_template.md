@@ -4,7 +4,7 @@
 ## Checks
 - [ ] `python -m pytest -q` passes
 - [ ] `ruff check .` passes
-- [ ] No audio, model files, ceiling files or reports, and no numbers measured from a real voice (see CONTRIBUTING.md)
+- [ ] No audio, model files, ceiling files or reports, and no new measurements of a real voice (see CONTRIBUTING.md)
 - [ ] If this changes how sound is processed: tests cover it, and the README's numbers still hold
 
 ## DCO

@@ -4,6 +4,7 @@
 !/.gitignore
 !/.gitattributes
 !/.gitleaks-version
+!/.gitleaks-sha256
 !/.gitleaks.toml
 !/CONTRIBUTING.md
 !/LICENSE
