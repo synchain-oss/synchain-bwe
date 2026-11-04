@@ -55,10 +55,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          # Commits whose message has no Signed-off-by line and whose author is not a bot.
+          # Dependabot doesn't sign off. Go by who opened the PR: a commit's author is only an email, so it can be forged.
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
+            echo "Dependabot PR, DCO not required"; exit 0
+          fi
+          # Commits whose message has no Signed-off-by line.
           gh api --paginate "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" \
-            --jq '.[] | select(((.commit.message | test("(?im)^Signed-off-by: .+ <.+@.+>$")) | not) and ((.author.login // "" | endswith("[bot]")) | not)) | .sha' > dco-bad.txt
+            --jq '.[] | select((.commit.message | test("(?im)^Signed-off-by: .+ <.+@.+>$")) | not) | .sha' > dco-bad.txt
           if [ -s dco-bad.txt ]; then
             while read -r sha; do
               echo "::error::Commit $sha has no Signed-off-by line. Commit with git commit -s; to fix it, git rebase --signoff."

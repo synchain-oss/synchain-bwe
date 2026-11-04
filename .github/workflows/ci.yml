@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: [main, 'feat/**', 'feature/**']
+    branches: [main]      # Branches are tested through their pull request, so a push doesn't run everything twice.
   workflow_dispatch:
 
 concurrency:
@@ -99,16 +99,16 @@ jobs:
         with: { persist-credentials: false, fetch-depth: 0 }
       - name: Only the files this repository needs, per folder
         run: |
-          allowed='^(src|tests)/.+\.py$|^\.github/.+\.yml$|^LICENSES/[^/]+\.txt$|^(LICENSE|README(\.zh-CN)?\.md|SECURITY\.md|CONTRIBUTING\.md|pyproject\.toml|REUSE\.toml|\.gitleaks\.toml|\.gitleaks-version|\.gitleaks-sha256|\.gitignore|\.gitattributes|\.github/CODEOWNERS|\.github/pull_request_template\.md)$'
+          allowed='^(src|tests)/.+\.py$|^\.github/(workflows/[^/]+|actions/[^/]+/action|dependabot)\.yml$|^LICENSES/[^/]+\.txt$|^(LICENSE|README(\.zh-CN)?\.md|SECURITY\.md|CONTRIBUTING\.md|pyproject\.toml|REUSE\.toml|\.gitleaks\.toml|\.gitleaks-version|\.gitleaks-sha256|\.gitignore|\.gitattributes|\.github/CODEOWNERS|\.github/pull_request_template\.md)$'
           outside() { grep -avE "$allowed" || true; }
 
           # This gate fails by passing silently, so first show that it still catches what it is for.
-          for name in voice.wav 'a b/voice.flac' src/ceiling.npy tests/data/ceiling.yml voice_ceiling.toml notes/report.md report.json ref.wav.py $'voice\xff.wav' $'src/\xe9\xe9/voice.wav'; do
+          for name in voice.wav 'a b/voice.flac' src/ceiling.npy .github/ceiling.yml .github/data/report.yml tests/data/ceiling.yml voice_ceiling.toml notes/report.md report.json ref.wav.py $'voice\xff.wav' $'src/\xe9\xe9/voice.wav'; do
             if [ -z "$(printf '%s\n' "$name" | outside)" ]; then
               echo "::error::The check let a bad name through in its self-test."; exit 1
             fi
           done
-          if [ -n "$(printf '%s\n' src/synchain_bwe/cli.py tests/test_cli.py README.md LICENSE .github/workflows/ci.yml | outside)" ]; then
+          if [ -n "$(printf '%s\n' src/synchain_bwe/cli.py tests/test_cli.py README.md LICENSE .github/workflows/ci.yml .github/actions/setup-gitleaks/action.yml .github/dependabot.yml | outside)" ]; then
             echo "::error::The check rejected a good name in its self-test."; exit 1
           fi
 

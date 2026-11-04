@@ -28,7 +28,9 @@
 !/tests/**/*.py
 /.github/**/*
 !/.github/**/
-!/.github/**/*.yml
+!/.github/workflows/*.yml
+!/.github/actions/*/action.yml
+!/.github/dependabot.yml
 !/.github/CODEOWNERS
 !/.github/pull_request_template.md
 __pycache__/
