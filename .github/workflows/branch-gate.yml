@@ -1,0 +1,73 @@
+name: Branch Gate
+
+# feat/* | feature/*  ->  main   (same repository)
+# any branch name     ->  main   (fork PR, except the long-lived branch name)
+# Every commit needs a Signed-off-by line (DCO, see CONTRIBUTING.md).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read                   # To read the commit list for the DCO check.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-gate:
+    name: branch-gate                   # Required check: never rename it, never add an if.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check source branch
+        env:
+          HEAD: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          # Dependabot branches never match feat/*, and a red required check would block every dependency update.
+          if [ "$ACTOR" = "dependabot[bot]" ]; then
+            echo "bot PR ($ACTOR): skip branch naming rule"; exit 0
+          fi
+
+          if [ "$HEAD_REPO" != "$THIS_REPO" ]; then
+            if [ "$HEAD" = "main" ]; then
+              echo "::error::Fork PR head branch must not be named 'main'. Please use another branch name."
+              exit 1
+            fi
+            echo "External (fork) PR from $HEAD_REPO:'$HEAD': naming rule skipped."
+            exit 0
+          fi
+
+          case "$HEAD" in
+            feat/*|feature/*|dependabot/*) ;;
+            *) echo "::error::Only 'feat/*' or 'feature/*' can merge into 'main'. Got: '$HEAD'"; exit 1 ;;
+          esac
+          echo "Branch gate passed: '$HEAD'"
+
+      # Inline gh api and no third-party action: the organization's allowed actions are a short list.
+      - name: DCO check (all commits must be signed off)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          # Dependabot doesn't sign off. Go by who opened the PR: a commit's author is only an email, so it can be forged.
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
+            echo "Dependabot PR, DCO not required"; exit 0
+          fi
+          # Commits whose message has no Signed-off-by line.
+          gh api --paginate "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" \
+            --jq '.[] | select((.commit.message | test("(?im)^Signed-off-by: .+ <.+@.+>$")) | not) | .sha' > dco-bad.txt
+          if [ -s dco-bad.txt ]; then
+            while read -r sha; do
+              echo "::error::Commit $sha has no Signed-off-by line. Commit with git commit -s; to fix it, git rebase --signoff."
+            done < dco-bad.txt
+            exit 1
+          fi
+          echo "DCO ok"

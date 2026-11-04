@@ -68,7 +68,10 @@ def _weight(L, a, b, s, e):
     centred on inner boundaries. Neighbouring chunks' weights sum to 1."""
     j = int(JOIN_S * RATE)
     t = np.arange(s, e)
-    r = lambda u: np.where(u <= 0, 0.0, np.where(u >= j, 1.0, 0.5 - 0.5 * np.cos(np.pi * u / j)))
+
+    def r(u):
+        return np.where(u <= 0, 0.0, np.where(u >= j, 1.0, 0.5 - 0.5 * np.cos(np.pi * u / j)))
+
     w = np.ones(e - s)
     if a > 0:
         w *= r(t - (a - j // 2) + 0.5)
