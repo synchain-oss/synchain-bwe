@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, 'feature/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read          # No secrets here, so fork PRs can run this safely.
+
+jobs:
+  # The tests use a stand-in for the model, so they need neither torch nor the model download.
+  checks:
+    name: checks (py ${{ matrix.python }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: '${{ matrix.python }}' }
+      - run: python -m pip install --disable-pip-version-check numpy soundfile soxr pyyaml pytest
+      - run: python -m pytest -q
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - run: pipx run ruff==0.17.3 check .
+
+  # Builds the package, checks what is in it, and runs the installed command without torch: the command must only load
+  # torch when it needs the model.
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: '3.12' }
+      - run: python -m pip install --disable-pip-version-check build==1.6.1
+      - run: python -m build
+      - name: Package contents
+        run: |
+          bad=$( { tar -tzf dist/*.tar.gz; unzip -Z1 dist/*.whl; } | grep -vE '/$|\.py$|/(LICENSE|PKG-INFO|METADATA|WHEEL|RECORD|entry_points\.txt|top_level\.txt|SOURCES\.txt|requires\.txt|dependency_links\.txt)$|/(README(\.zh-CN)?\.md|SECURITY\.md|pyproject\.toml|setup\.cfg)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Unexpected files in the package:"; printf '%s\n' "$bad"; exit 1
+          fi
+      - name: Installed command
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          bin="$RUNNER_TEMP/venv/bin"
+          "$bin/pip" install --disable-pip-version-check --no-deps dist/*.whl
+          "$bin/pip" install --disable-pip-version-check numpy soundfile soxr pyyaml
+          cd "$RUNNER_TEMP"
+          "$bin/synchain-bwe" --version
+          "$bin/synchain-bwe" --help > /dev/null
+          "$bin/python" -c "import numpy as n, soundfile as s; s.write('noise.wav', n.random.default_rng(0).normal(0, .05, 22050 * 5), 22050)"
+          "$bin/synchain-bwe" detect noise.wav
+          ! "$bin/python" -c "import torch" 2> /dev/null
+
+  # .gitignore is an allow-list, but `git add -f` gets past it. Checks every path in the history as well as the tree: an
+  # audio file that a later commit deletes is still public. Real voices must not get into this repository.
+  no-voice-data:
+    name: no-voice-data
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - name: Only the kinds of file this repository needs
+        run: |
+          paths=$( { git -c core.quotepath=off ls-files; git -c core.quotepath=off log -m --name-only --format=; } | sort -u | grep -v '^$')
+          bad=$(printf '%s\n' "$paths" | grep -vE '\.(py|md|toml|yml)$|^LICENSES/[^/]+\.txt$|^(LICENSE|\.gitignore|\.gitattributes|\.gitleaks-version|\.github/CODEOWNERS)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Not allowed in this repository (audio, models, ceilings and reports stay out):"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+      - name: No large files
+        run: |
+          big=$(git ls-files -z | xargs -0 -I{} find {} -size +256k)
+          if [ -n "$big" ]; then
+            echo "::error::Files over 256 KB:"; printf '%s\n' "$big"; exit 1
+          fi
+
+  # Secret scan of the working tree, plus the REUSE licence check.
+  compliance:
+    name: compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: ./.github/actions/setup-gitleaks
+      - name: Secret scan (working tree)
+        run: gitleaks detect --no-git --source . --redact -v --config .gitleaks.toml
+      - name: REUSE lint
+        run: pipx run reuse==6.3.0 lint
+
+  # The scan above only sees the tree. A credential pushed and later deleted is only visible here.
+  secret-history:
+    name: secret-history
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - uses: ./.github/actions/setup-gitleaks
+      - name: Secret scan (git history)
+        run: gitleaks detect --redact -v --config .gitleaks.toml
+
+  # The required check. needs must list every other job, or a red job could still be merged.
+  bwe-gate:
+    name: bwe-gate
+    needs: [checks, lint, smoke, no-voice-data, compliance, secret-history]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = "success" ] || exit 1
+          done

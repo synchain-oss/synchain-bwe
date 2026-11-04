@@ -1,0 +1,12 @@
+# gitleaks settings. The version is pinned in .gitleaks-version.
+
+title = "gitleaks config: synchain-bwe"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+  description = "Licence texts (high-entropy text, not credentials)"
+  paths = [
+    '''^LICENSES/''',
+  ]

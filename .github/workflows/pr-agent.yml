@@ -1,0 +1,26 @@
+name: PR Agent (DeepSeek V4.1 Flash)
+
+# pr-agent (describe / review / improve), DeepSeek V4.1 Flash through OpenCode Go, billed by use. Runs on every push to a
+# PR into main, the only long-lived branch here. Model, limits, timeouts and the pinned image are kept in
+# Synchain-oss/ci-workflows.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review, synchronize]
+
+permissions: {}
+
+jobs:
+  pr-agent:
+    permissions:
+      contents: read        # pr-agent reads the PR files and .pr_agent.toml.
+      issues: write
+      pull-requests: write
+    uses: Synchain-oss/ci-workflows/.github/workflows/pr-agent.yml@070537914c9af4c2742b8fc5c7f63e06daef82ae # v1.3.3
+    with:
+      provider: opencode-go
+      base_branches: '["main"]'
+      ignore_globs: '["LICENSES/*"]'
+    secrets:
+      api_key: ${{ secrets.OPENCODE_GO_API_KEY_FOR_REVIEW }}

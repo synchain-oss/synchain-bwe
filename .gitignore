@@ -2,14 +2,23 @@
 # files, ceiling files and reports (those describe a real voice).
 /*
 !/.gitignore
+!/.gitattributes
+!/.gitleaks-version
+!/.gitleaks.toml
+!/CONTRIBUTING.md
 !/LICENSE
+!/LICENSES/
 !/README.md
 !/README.zh-CN.md
+!/REUSE.toml
 !/SECURITY.md
 !/pyproject.toml
 !/src/
 !/tests/
 !/.github/
+/LICENSES/**/*
+!/LICENSES/**/
+!/LICENSES/**/*.txt
 /src/**/*
 !/src/**/
 !/src/**/*.py
@@ -19,4 +28,6 @@
 /.github/**/*
 !/.github/**/
 !/.github/**/*.yml
+!/.github/CODEOWNERS
+!/.github/pull_request_template.md
 __pycache__/
